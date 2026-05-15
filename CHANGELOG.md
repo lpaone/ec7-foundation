@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file. The
 format is inspired by [Keep a Changelog](https://keepachangelog.com/)
 and the project follows [SemVer](https://semver.org/).
 
+## [0.2.1] - 2026-05-15
+
+### Changed
+- Translated all source docstrings and inline comments to English, in
+  Google style (`Args:` / `Returns:` / `Raises:` / `Attributes:`).
+- Translated README, CHANGELOG and PUBLISHING to English. User-facing
+  report strings remain Italian.
+
 ## [0.2.0] - 2026-05-14
 
 ### Added

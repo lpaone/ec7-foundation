@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # -------------------------------------------------------------------------
 [project]
 name = "ec7-foundation"
-version = "0.2.0"
+version = "0.2.1"
 description = "Verifica di fondazioni superficiali secondo Eurocodice 7 (EN 1997-1) e NTC 2018: capacità portante, scorrimento, ribaltamento e cedimenti, statici e sismici, su stratigrafia con falda."
 readme = "README.md"
 requires-python = ">=3.10"
