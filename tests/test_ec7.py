@@ -1,7 +1,8 @@
-"""Test del modulo ec7.
+"""Tests for the ec7 module.
 
-Test rapidi: includono valori di riferimento per terreno granulare
-classico (phi=30°, c=0) confrontati con i fattori di Vesic noti dalla letteratura.
+Quick tests including reference values for a classic granular soil
+(phi=30°, c=0) compared against the well-known Vesic factors from the
+literature.
 """
 
 import math
@@ -23,7 +24,7 @@ from ec7 import (
 from ec7.bearing import _bearing_capacity_coefficients, compute_bearing_capacity
 
 # ---------------------------------------------------------------------------
-# 1) Fattori N di Vesic - confronto con valori tabellari da letteratura
+# 1) Vesic N factors - comparison with tabulated literature values
 # ---------------------------------------------------------------------------
 
 
@@ -36,7 +37,7 @@ def test_N_factors_phi_30():
 
 
 def test_N_factors_phi_0():
-    """Caso limite phi=0: Nc=5.14, Nq=1, Ngamma=0."""
+    """Limit case phi=0: Nc=5.14, Nq=1, Ngamma=0."""
     Nc, Nq, Ngamma = _bearing_capacity_coefficients(0.0)
     assert Nc == pytest.approx(5.14, rel=0.01)
     assert Nq == pytest.approx(1.0)
@@ -52,31 +53,32 @@ def test_N_factors_phi_35():
 
 
 # ---------------------------------------------------------------------------
-# 2) Caso "scolastico" centrato verticale - confronto con Terzaghi semplificato
+# 2) "Textbook" centred vertical case - comparison with simplified Terzaghi
 # ---------------------------------------------------------------------------
 
 
 def test_strip_centered_drained():
-    """Plinto nastriforme 2 m, D=1 m, terreno phi=30°, c=0, gamma=18.
-    Stima ordine di grandezza q_ult ≈ 0.5*18*2*22.4 + 18*1*18.4 ≈ 734 kPa.
+    """Strip footing 2 m, D=1 m, soil phi=30°, c=0, gamma=18.
+
+    Order-of-magnitude estimate q_ult ≈ 0.5*18*2*22.4 + 18*1*18.4 ≈ 734 kPa.
     """
     footing = StripFooting(B=2.0, D=1.0)
     soil = Soil(phi_k=30, c_k=0, gamma=18, gamma_sat=20, drained=True)
-    actions = DesignActions(V=200)  # piccola carico, solo per geometria
+    actions = DesignActions(V=200)  # small load, just for geometry
 
     from ec7.bearing import compute_bearing_capacity
 
-    # parametri caratteristici, fattori parziali = 1 -> q_ult atteso ~ 734 kPa
+    # characteristic parameters, partial factors = 1 -> expected q_ult ~ 734 kPa
     comp = compute_bearing_capacity(footing, soil, actions)
-    # nastro -> sq, sgamma = 1
+    # strip -> sq, sgamma = 1
     assert comp.factors.sq == pytest.approx(1.0, abs=0.01)
-    # q_ult ordine di grandezza
+    # q_ult order of magnitude
     expected = 0.5 * 18 * 2 * 22.4 + 18 * 1 * 18.4
     assert comp.q_ult == pytest.approx(expected, rel=0.05)
 
 
 # ---------------------------------------------------------------------------
-# 3) Eccentricità: area efficace ridotta correttamente
+# 3) Eccentricity: effective area reduced correctly
 # ---------------------------------------------------------------------------
 
 
@@ -100,7 +102,7 @@ def test_eccentricity_out_of_core():
 
 
 # ---------------------------------------------------------------------------
-# 4) Differenze tra approcci: DA2 deve essere più gravoso di DA1-C1 sul lato R
+# 4) Differences between approaches: DA2 must be more severe than DA1-C1 on R
 # ---------------------------------------------------------------------------
 
 
@@ -114,16 +116,16 @@ def test_codes_relative_severity():
     r_da3 = ShallowFoundation(footing, soil, actions, EC7_DA3()).check_bearing()
     r_ntc2 = ShallowFoundation(footing, soil, actions, NTC2018_A2()).check_bearing()
 
-    # DA2 ha gamma_Rv=1.4 vs DA1-C1 = 1.0 -> R_d minore
+    # DA2 has gamma_Rv=1.4 vs DA1-C1=1.0 -> lower R_d
     assert r_da2.R_d < r_da1c1.R_d
-    # NTC A2 con gamma_R=2.3 è il più gravoso sul lato resistenza
+    # NTC A2 with gamma_R=2.3 is the most severe on the resistance side
     assert r_ntc2.R_d < r_da2.R_d
-    # DA3 ha M2 (riduce phi) ma R3=1.0
+    # DA3 uses M2 (reduces phi) but R3=1.0
     assert r_da3.R_d < r_da1c1.R_d
 
 
 # ---------------------------------------------------------------------------
-# 5) Verifica non drenata
+# 5) Undrained check
 # ---------------------------------------------------------------------------
 
 
@@ -138,7 +140,7 @@ def test_undrained_bearing():
 
 
 # ---------------------------------------------------------------------------
-# 6) Test integrazione: report completo
+# 6) Integration test: full report
 # ---------------------------------------------------------------------------
 
 
@@ -148,22 +150,22 @@ def test_full_report():
     actions = DesignActions(V=1200, H_x=150, M_y=100)
     f = ShallowFoundation(footing, soil, actions, code=NTC2018_A2())
     report = f.verify_all(s_limit=0.025)
-    # tutti i risultati presenti
+    # all results populated
     assert report.bearing is not None
     assert report.sliding is not None
     assert report.overturning is not None
     assert report.settlement is not None
-    # check coerenza
+    # sanity checks
     assert report.bearing.R_d > 0
     assert report.bearing.q_ult > 0
-    # il report deve essere stringificabile
+    # the report must be stringifiable
     s = str(report)
     assert "NTC 2018" in s
     assert "Capacità portante" in s
 
 
 # ---------------------------------------------------------------------------
-# 7) Fondazione circolare
+# 7) Circular footing
 # ---------------------------------------------------------------------------
 
 
@@ -174,7 +176,7 @@ def test_circular_footing():
     f = ShallowFoundation(footing, soil, actions, code=EC7_DA2())
     bearing = f.check_bearing()
     assert bearing.R_d > 0
-    assert bearing.A_eff < footing.area  # eccentricità riduce area
+    assert bearing.A_eff < footing.area  # eccentricity reduces the area
 
 
 if __name__ == "__main__":

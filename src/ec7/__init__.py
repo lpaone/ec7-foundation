@@ -1,13 +1,14 @@
-"""
-ec7 - Verifica di fondazioni superficiali secondo Eurocodice 7 (EN 1997-1)
-        e Norme Tecniche per le Costruzioni 2018 (NTC 2018).
+"""ec7 - Shallow-foundation verification per Eurocode 7 (EN 1997-1) and
+Italian NTC 2018.
 
-Supporta:
-  - geometria rettangolare, nastriforme, circolare
-  - eccentricità su due assi (Meyerhof)
-  - terreno monostrato o stratigrafia (SoilProfile) con falda multistrato
-  - verifiche statiche e sismiche (Paolucci & Pecker 1997)
-  - cedimenti elastici monostrato (Bowles) e multistrato (Steinbrenner)
+Supports:
+    - rectangular, strip, circular geometry
+    - two-axis eccentricity (Meyerhof)
+    - single-layer soil or layered profile (``SoilProfile``) with
+      multilayer groundwater
+    - static and seismic checks (Paolucci & Pecker 1997)
+    - elastic settlement, single-layer (Bowles) and multilayer
+      (Steinbrenner)
 """
 
 from .actions import DesignActions

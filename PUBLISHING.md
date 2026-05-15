@@ -1,19 +1,19 @@
 # Publishing ec7-foundation
 
-Guida rapida per pubblicare il pacchetto su PyPI con `uv`.
+Quick guide to publishing the package to PyPI with `uv`.
 
-## 1. Prerequisiti
+## 1. Prerequisites
 
-- Account su [PyPI](https://pypi.org) e [TestPyPI](https://test.pypi.org).
-- Un **API token** per ciascuno dei due (gestione → "Account settings"
-  → "API tokens"). Imposta lo scope inizialmente al solo progetto se
-  esiste, o "entire account" per la prima pubblicazione.
-- `uv` installato (`curl -LsSf https://astral.sh/uv/install.sh | sh`).
+- Accounts on [PyPI](https://pypi.org) and [TestPyPI](https://test.pypi.org).
+- An **API token** for each (manage → "Account settings" → "API tokens").
+  Initially scope it to the project alone if it already exists, or
+  "entire account" for the first publication.
+- `uv` installed (`curl -LsSf https://astral.sh/uv/install.sh | sh`).
 
-## 2. Aggiornare la versione
+## 2. Bump the version
 
-Modifica la stringa `version = "x.y.z"` in `pyproject.toml` e
-aggiorna il `CHANGELOG.md`. Esegui i test:
+Edit the `version = "x.y.z"` string in `pyproject.toml` and update
+`CHANGELOG.md`. Run the tests:
 
 ```bash
 uv sync
@@ -21,26 +21,26 @@ uv run pytest
 uv run ruff check .
 ```
 
-## 3. Costruire i pacchetti
+## 3. Build the packages
 
 ```bash
 rm -rf dist/
 uv build
 ```
 
-Produce due artefatti in `dist/`:
+Produces two artefacts in `dist/`:
 
-- `ec7_foundation-x.y.z-py3-none-any.whl`  (wheel binario)
+- `ec7_foundation-x.y.z-py3-none-any.whl`  (binary wheel)
 - `ec7_foundation-x.y.z.tar.gz`             (source distribution)
 
-## 4. Test su TestPyPI (consigliato la prima volta)
+## 4. Test on TestPyPI (recommended the first time)
 
 ```bash
 uv publish --publish-url https://test.pypi.org/legacy/ \
     --token "pypi-XXXXXXXXXXXX..."
 ```
 
-Verifica installando da TestPyPI in una venv pulita:
+Verify by installing from TestPyPI in a clean venv:
 
 ```bash
 uv venv /tmp/test-install
@@ -51,29 +51,29 @@ uv venv /tmp/test-install
 /tmp/test-install/bin/ec7-verify --version
 ```
 
-## 5. Pubblicazione su PyPI
+## 5. Publish to PyPI
 
 ```bash
 uv publish --token "pypi-XXXXXXXXXXXX..."
 ```
 
-In alternativa, puoi salvare il token in `~/.pypirc` e usare semplicemente
+Alternatively, you can save the token in `~/.pypirc` and simply run
 `uv publish`.
 
-## 6. Tag git e release
+## 6. Git tag and release
 
 ```bash
 git tag -a vx.y.z -m "Release x.y.z"
 git push origin vx.y.z
 ```
 
-Crea una release su GitHub allegando il contenuto della sezione del
-`CHANGELOG.md`.
+Create a release on GitHub attaching the contents of the relevant
+`CHANGELOG.md` section.
 
-## Note
+## Notes
 
-- Il nome `ec7-foundation` deve essere disponibile su PyPI. Se non lo è,
-  cambia `name` in `pyproject.toml` (es. `ec7-foundation-yourname`).
-- Per CI/CD (GitHub Actions) puoi usare l'azione ufficiale
+- The name `ec7-foundation` must be available on PyPI. If it is not,
+  change `name` in `pyproject.toml` (e.g. `ec7-foundation-yourname`).
+- For CI/CD (GitHub Actions) you can use the official
   [`pypa/gh-action-pypi-publish`](https://github.com/pypa/gh-action-pypi-publish)
-  con OIDC/Trusted Publishing (no token).
+  action with OIDC/Trusted Publishing (no token).

@@ -1,7 +1,7 @@
-"""Classi di verifica: capacità portante, scorrimento, ribaltamento, cedimento.
+"""Verification classes: bearing capacity, sliding, overturning, settlement.
 
-Ognuna è un oggetto callable che, dato (footing, soil, actions, code),
-restituisce un Result.
+Each check is a callable object that, given
+``(footing, soil, actions, code)``, returns a ``Result``.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 
 def _design_profile(profile: SoilProfile, code) -> SoilProfile:
-    """Crea una copia del profilo con parametri di progetto in ogni strato."""
+    """Return a copy of the profile with design parameters in every layer."""
     from .profile import SoilLayer, SoilProfile
 
     new_layers = []
@@ -49,17 +49,19 @@ class Check(ABC):
 
 
 class BearingCheck(Check):
-    """Verifica di capacità portante (SLU/GEO).
+    """Bearing-capacity verification (SLU/GEO).
 
-    1. trasforma terreno e azioni in valori di progetto secondo `code`;
-    2. se è fornito un `profile` stratigrafico, ricava un `Soil` equivalente
-       nel volume di influenza e usa il `profile` per il calcolo di q' al
-       piano di posa (gestendo correttamente la falda multistrato);
-    3. se è fornita un `seismic`, applica i fattori di Paolucci & Pecker
-       e l'eventuale effetto di kv sul peso di volume;
-    4. calcola R_k con la formula di Annex D;
-    5. R_d = R_k / gamma_Rv;
-    6. confronta con V_d.
+    Steps:
+        1. Transform soil and actions into design values via ``code``.
+        2. If a layered ``profile`` is provided, derive an equivalent
+           ``Soil`` over the influence volume and use ``profile`` for the
+           q' computation at the footing base (handling multilayer water
+           correctly).
+        3. If ``seismic`` is provided, apply Paolucci & Pecker factors and
+           the kv effect on unit weight.
+        4. Compute R_k via Annex D.
+        5. R_d = R_k / gamma_Rv.
+        6. Compare to V_d.
     """
 
     def __init__(
@@ -75,9 +77,9 @@ class BearingCheck(Check):
         self.depth_of_influence = depth_of_influence
 
     def run(self, footing, soil, actions, code) -> BearingResult:
-        # se viene fornito un profilo, ricavo il Soil equivalente da esso
+        # if a profile is provided, derive the equivalent Soil from it
         if self.profile is not None:
-            B_ref = footing.equivalent_BL[0]  # lato corto
+            B_ref = footing.equivalent_BL[0]  # short side
             zoi = self.depth_of_influence if self.depth_of_influence else B_ref
             soil_eq = self.profile.equivalent_soil(footing.D, B_ref, zoi)
             soil_d = code.design_soil(soil_eq)
@@ -109,18 +111,17 @@ class BearingCheck(Check):
 
 
 class SlidingCheck(Check):
-    """Verifica a scorrimento sulla base (SLU).
+    """Sliding check on the base (SLU).
 
-    Drenata    : R_h_k = V * tan(delta) + c_a * A'
-    Non drenata: R_h_k = A' * cu
+    Drained:    R_h_k = V * tan(delta) + c_a * A'
+    Undrained:  R_h_k = A' * cu
 
-    `delta` è l'angolo di attrito base-terreno; per default delta=phi
-    (calcestruzzo gettato in opera) come da EN 1997-1 §6.5.3(10).
-    Per cls prefabbricato o lisciato si può ridurre a delta = 2/3 phi.
+    ``delta`` is the base/soil friction angle; default ``delta = phi``
+    (cast-in-place concrete) per EN 1997-1 §6.5.3(10). For precast or
+    smoothed concrete it can be reduced to ``delta = 2/3 phi``.
 
-    Se viene passato `profile`, i parametri usati sono quelli dello strato
-    a contatto con la base. Se è passata `seismic`, V viene ridotto da kv
-    verticale ascendente.
+    If ``profile`` is provided, parameters come from the layer in contact
+    with the base. If ``seismic`` is provided, V is reduced by upward kv.
     """
 
     def __init__(
@@ -133,7 +134,7 @@ class SlidingCheck(Check):
         seismic: SeismicAction | None = None,
     ):
         if not 0 < delta_over_phi <= 1:
-            raise ValueError("delta_over_phi deve essere in (0,1].")
+            raise ValueError("delta_over_phi must be in (0, 1].")
         self.delta_over_phi = delta_over_phi
         self.c_adhesion = c_adhesion
         self.Q_fraction = Q_fraction
@@ -142,7 +143,7 @@ class SlidingCheck(Check):
         self.seismic = seismic
 
     def run(self, footing, soil, actions, code) -> SlidingResult:
-        # parametri di contatto: prendo lo strato a z = D (sotto la base)
+        # contact parameters: pick the layer at z = D (below the base)
         if self.profile is not None:
             contact_soil = self.profile.layer_at(footing.D).soil
             soil_d = code.design_soil(contact_soil)
@@ -157,7 +158,7 @@ class SlidingCheck(Check):
         H_d = actions_d.H_resultant
         V_d = actions_d.V
 
-        # effetto kv verticale (riduzione conservativa di V)
+        # vertical kv effect (conservative reduction of V)
         if self.seismic is not None and self.seismic.kv != 0:
             V_d = V_d * (1.0 - abs(self.seismic.kv))
 
@@ -179,40 +180,40 @@ class SlidingCheck(Check):
 
 
 class OverturningCheck(Check):
-    """Verifica a ribaltamento (EQU) attorno allo spigolo della fondazione.
+    """Overturning check (EQU) about a footing edge.
 
-    Si considera il momento stabilizzante (peso verticale * braccio) contro
-    il momento ribaltante (azione orizzontale * altezza + momento applicato).
+    Compares the stabilising moment (vertical weight times lever arm)
+    against the overturning moment (horizontal action times height plus
+    applied moment).
 
-    Asse di calcolo:
-      - 'y' : ribaltamento attorno al lato lungo, dovuto a H_x e/o M_y
-      - 'x' : ribaltamento attorno al lato corto, dovuto a H_y e/o M_x
+    Axes:
+        - ``'y'``: overturning about the long side, due to H_x and/or M_y
+        - ``'x'``: overturning about the short side, due to H_y and/or M_x
 
-    Si usa Approccio EQU: gamma_G,dst=1.1, gamma_G,stb=0.9 (EN 1997-1 Annex A,
-    Tab. A.1). Per semplificazione, qui useremo direttamente i coefficienti
-    della DesignCode con favorable/unfavorable, lasciando la scelta a chi
-    chiama. È noto che EQU andrebbe trattato a parte.
+    EQU approach: gamma_G,dst = 1.1, gamma_G,stb = 0.9 (EN 1997-1 Annex A,
+    Tab. A.1). For simplicity this implementation uses the current
+    ``DesignCode`` coefficients with favourable/unfavourable flags, leaving
+    the choice to the caller. Strictly EQU should be handled separately.
     """
 
     def __init__(self, axis: str = "y", h_arm: float | None = None, Q_fraction: float = 0.0):
         if axis not in ("x", "y"):
-            raise ValueError("axis deve essere 'x' o 'y'.")
+            raise ValueError("axis must be 'x' or 'y'.")
         self.axis = axis
-        self.h_arm = h_arm  # braccio di applicazione di H (default = D)
+        self.h_arm = h_arm  # H application lever arm (default = D)
         self.Q_fraction = Q_fraction
 
     def run(self, footing, soil, actions, code) -> OverturningResult:
-        # per EQU il verticale è favorevole, l'orizzontale è sfavorevole;
-        # gestiamo le azioni come sono state passate (caratteristiche) e
-        # applichiamo manualmente i coefficienti EQU se richiesti.
-        # Versione semplificata: usiamo le azioni "di progetto" del codice
-        # corrente (consigliato passare actions con favorable=True per V se
-        # si vuole l'effetto stabilizzante).
+        # For EQU, the vertical is favourable and horizontal is unfavourable;
+        # we accept the actions as passed (characteristic) and manually apply
+        # the EQU factors if needed. Simplified version: use the design
+        # actions of the current code (it is recommended to pass actions
+        # with favorable=True on V if the stabilising effect is desired).
         actions_d = code.design_actions(actions, self.Q_fraction)
 
         B, L = footing.equivalent_BL
         if self.axis == "y":
-            # ribaltamento attorno asse parallelo a L -> braccio = B/2
+            # overturning about an axis parallel to L -> arm = B/2
             arm = B / 2
             H_dst = abs(actions_d.H_x)
             M_dst = abs(actions_d.M_y)
@@ -235,26 +236,29 @@ class OverturningCheck(Check):
 
 
 class SettlementCheck(Check):
-    """Cedimento elastico immediato (SLE) sotto carichi caratteristici.
+    """Immediate elastic settlement (SLE) under characteristic loads.
 
-    Due modalità:
-      a) **monostrato** (default): soluzione di Schleicher con coefficiente
-         di influenza tabellato da Bowles:
-             s = q * B * (1 - nu^2) * I_s / E
+    Two modes:
+        a) **Single layer** (default): Schleicher's solution with the
+           influence coefficient tabulated by Bowles:
 
-      b) **multistrato (Steinbrenner)**: se viene passato un `SoilProfile`,
-         si suddivide il sottosuolo in strati e si somma il contributo di
-         ogni strato come differenza dei cedimenti calcolati al letto e al
-         tetto (formula di Steinbrenner 1934):
+               s = q * B * (1 - nu^2) * I_s / E
 
-             s = sum_i q * B' * (1 - nu_i^2) / E_i * (F1_i^bot - F1_i^top)
+        b) **Multilayer (Steinbrenner)**: if a ``SoilProfile`` is provided,
+           the subsoil is split into layers and each contribution is the
+           difference between settlements computed at the layer bottom and
+           top (Steinbrenner 1934):
 
-         dove F1 è la funzione di influenza di Steinbrenner per fondazione
-         rigida rettangolare. Implementiamo F1 come integrale numerico
-         della soluzione di Boussinesq, valido per fondazione flessibile
-         (al centro). Per fondazione rigida si applica un fattore 0.93.
+               s = sum_i q * B' * (1 - nu_i^2) / E_i
+                       * (F1_i^bot - F1_i^top)
 
-    NB: cedimento di consolidazione e secondario NON inclusi.
+           where F1 is Steinbrenner's influence function for a rigid
+           rectangular footing. F1 is implemented as the numerical
+           integral of Boussinesq's solution, valid for a flexible
+           footing (at the centre). For a rigid footing apply a 0.93
+           correction factor.
+
+    Note: consolidation and secondary settlement are NOT included.
     """
 
     def __init__(
@@ -266,24 +270,18 @@ class SettlementCheck(Check):
         rigid_correction: float = 1.0,
         n_sublayers: int = 1,
     ):
-        """
-        Parametri
-        ----------
-        s_limit : float
-            Cedimento ammissibile [m].
-        influence_factor : float
-            Override del coefficiente I_s (solo modalità monostrato).
-        profile : SoilProfile
-            Se fornito, attiva la modalità Steinbrenner multistrato.
-        z_max : float
-            Profondità massima di integrazione [m] dal piano campagna.
-            Default: D + 2*B (zona di influenza pratica).
-        rigid_correction : float
-            Fattore di correzione per fondazione rigida (0.93 tipico) o
-            flessibile (1.0). Default 1.0.
-        n_sublayers : int
-            Numero di sotto-strati in cui dividere ciascuno strato fisico
-            per migliorare la precisione di Steinbrenner (default 1).
+        """Initialise the check.
+
+        Args:
+            s_limit: Allowable settlement [m].
+            influence_factor: Override of I_s (single-layer mode only).
+            profile: If provided, enables multilayer Steinbrenner mode.
+            z_max: Maximum integration depth [m] from ground surface.
+                Default: D + 2*B (practical influence zone).
+            rigid_correction: Correction factor for a rigid (0.93 typical)
+                or flexible (1.0) footing. Default 1.0.
+            n_sublayers: Number of sublayers each physical layer is split
+                into for Steinbrenner accuracy (default 1).
         """
         self.s_limit = s_limit
         self.I_s_override = influence_factor
@@ -293,7 +291,7 @@ class SettlementCheck(Check):
         self.n_sublayers = max(1, int(n_sublayers))
 
     # ------------------------------------------------------------------
-    # monostrato (Bowles)
+    # single layer (Bowles)
     # ------------------------------------------------------------------
     @staticmethod
     def _influence_factor(B: float, L: float) -> float:
@@ -310,15 +308,17 @@ class SettlementCheck(Check):
             return 2.10
 
     # ------------------------------------------------------------------
-    # multistrato (Steinbrenner) - F1, F2 al centro di rettangolo flessibile
-    # Riferimento: Bowles (1996), Foundation Analysis and Design, §5-6
+    # multilayer (Steinbrenner) - F1, F2 at the centre of a flexible
+    # rectangle. Reference: Bowles (1996), Foundation Analysis and
+    # Design, §5-6.
     # ------------------------------------------------------------------
     @staticmethod
     def _steinbrenner_F1F2(B: float, L: float, H: float) -> tuple[float, float]:
-        """Fattori F1, F2 di Steinbrenner per l'angolo di un rettangolo
-        (B x L) caricato uniformemente su uno strato di spessore H.
+        """Return Steinbrenner F1, F2 for a rectangle corner.
 
-        Definizioni (Bowles 1996):
+        Rectangle ``B x L`` uniformly loaded on a layer of thickness H.
+
+        Definitions (Bowles 1996):
             m' = L/B,  n' = H/B
             A0 = m' * ln( ((1+sqrt(m'^2+1))*sqrt(m'^2+n'^2)) /
                             (m'*(1+sqrt(m'^2+n'^2+1))) )
@@ -328,17 +328,18 @@ class SettlementCheck(Check):
             F1 = (1/pi) * (A0 + A1)
             F2 = (n'/(2*pi)) * atan(A2)
 
-        Per il *centro* del rettangolo (B x L), si applica con B'=B/2,
-        L'=L/2, e poi si moltiplica per 4 (sovrapposizione di 4 quarti).
+        For the *centre* of a rectangle ``B x L``, apply this with
+        ``B' = B/2``, ``L' = L/2`` and multiply by 4 (superposition of
+        the four quarter-rectangles).
         """
         if H <= 0 or B <= 0:
             return 0.0, 0.0
-        # convenzione: m' = L/B
+        # convention: m' = L/B
         if L < B:
             B, L = L, B
         mp = L / B
         np = H / B
-        # protezione numerica
+        # numerical protection
         eps = 1e-12
         s1 = math.sqrt(mp * mp + 1)
         s2 = math.sqrt(mp * mp + np * np + 1)
@@ -364,9 +365,9 @@ class SettlementCheck(Check):
 
     @classmethod
     def _Is(cls, B: float, L: float, H: float, nu: float) -> float:
-        """Fattore di forma Is = F1 + (1-2ν)/(1-ν) * F2 al centro.
+        """Shape factor Is = F1 + (1 - 2ν)/(1 - ν) * F2 at the centre.
 
-        Si calcola F1, F2 per il quarto B/2 x L/2 di altezza H.
+        Computes F1, F2 for the B/2 x L/2 quarter of height H.
         """
         F1, F2 = cls._steinbrenner_F1F2(B / 2, L / 2, H)
         if abs(1 - nu) < 1e-9:
@@ -377,13 +378,14 @@ class SettlementCheck(Check):
     def _settlement_layer(
         cls, B: float, L: float, H_top: float, H_bot: float, q: float, E: float, nu: float
     ) -> float:
-        """Cedimento di uno strato compreso tra H_top e H_bot (profondità
-        misurate dalla base della fondazione), formula di Bowles:
+        """Settlement of one layer between H_top and H_bot.
 
-            s = q * (B/2) * (1-ν²) / E * (4) * (Is(H_bot) - Is(H_top))
+        Depths are measured from the footing base, Bowles' formula:
 
-        Il fattore 4 corrisponde alla sovrapposizione dei 4 quarti per
-        ottenere il cedimento al *centro* della fondazione.
+            s = q * (B/2) * (1 - ν²) / E * 4 * (Is(H_bot) - Is(H_top))
+
+        The factor 4 accounts for the superposition of the four
+        quarter-rectangles to obtain the centre settlement.
         """
         if H_bot <= H_top:
             return 0.0
@@ -396,7 +398,7 @@ class SettlementCheck(Check):
     # run
     # ------------------------------------------------------------------
     def run(self, footing, soil, actions, code) -> SettlementResult:
-        # SLE: carichi e parametri caratteristici
+        # SLE: characteristic loads and parameters
         e_B, e_L = actions.eccentricities()
         eff = footing.effective_geometry(e_B, e_L)
         B_eff, L_eff, A_eff = eff.B_eff, eff.L_eff, eff.A_eff
@@ -405,9 +407,9 @@ class SettlementCheck(Check):
         from .geometry import CircularFooting
 
         if self.profile is None:
-            # ---- modalità monostrato ----
+            # ---- single-layer mode ----
             if soil.E is None:
-                raise ValueError("Serve E nel Soil per il cedimento monostrato.")
+                raise ValueError("Soil.E is required for single-layer settlement.")
             if isinstance(footing, CircularFooting):
                 I_s = 0.88
                 B_ref = 2 * footing.R
@@ -418,24 +420,25 @@ class SettlementCheck(Check):
             s *= self.rigid_correction
             return SettlementResult(s_elastic=s, s_limit=self.s_limit)
 
-        # ---- modalità Steinbrenner multistrato ----
+        # ---- multilayer Steinbrenner mode ----
         D = footing.D
         z_max = self.z_max if self.z_max is not None else D + 2 * B_eff
         layers_under = self.profile.layers_under(D, z_max=z_max)
         if not layers_under:
-            raise ValueError("Nessuno strato sotto il piano di posa per il calcolo cedimenti.")
+            raise ValueError("No layers below the footing base for settlement computation.")
 
         s_total = 0.0
-        # iteriamo sugli strati sotto la base, splittando ciascuno in n_sublayers
-        # per migliorare la precisione (utile se strato spesso o variabile)
+        # iterate over layers below the base, splitting each into
+        # n_sublayers to improve accuracy (useful for thick or variable
+        # layers)
         for z_top_abs, z_bot_abs, layer in layers_under:
             if layer.soil.E is None:
                 raise ValueError(
-                    f"Strato '{layer.soil.name}' senza modulo E: cedimento non calcolabile."
+                    f"Layer '{layer.soil.name}' has no E modulus: settlement not computable."
                 )
             E = layer.soil.E
             nu = layer.soil.nu
-            # profondità rispetto al piano di posa
+            # depth relative to the footing base
             H_top = z_top_abs - D
             H_bot = z_bot_abs - D
             zs = [

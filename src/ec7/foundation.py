@@ -1,4 +1,4 @@
-"""Classe principale: orchestra le verifiche su una fondazione superficiale."""
+"""Main class: orchestrates verifications on a shallow foundation."""
 
 from __future__ import annotations
 
@@ -26,24 +26,27 @@ from .soil import Soil
 
 
 class ShallowFoundation:
-    """Fondazione superficiale completa.
+    """Complete shallow foundation.
 
-    Composizione:
-      - footing  : geometria
-      - soil     : terreno (monostrato) - OPZIONALE se è fornito un profile
-      - profile  : profilo stratigrafico - alternativa o complemento a soil
-      - actions  : azioni caratteristiche (V, H, M)
-      - seismic  : azione sismica (kh, kv) per condizioni sismiche
-      - code     : normativa / approccio di progetto
+    Composition:
+        - ``footing``: geometry
+        - ``soil``: single-layer soil — OPTIONAL when a ``profile`` is provided
+        - ``profile``: layered profile — alternative or complement to ``soil``
+        - ``actions``: characteristic actions (V, H, M)
+        - ``seismic``: seismic action (kh, kv) for seismic conditions
+        - ``code``: code / design approach
 
-    Per uso monostrato (compatibilità con la prima versione):
+    Single-layer usage (v0.1 compatibility):
+
         f = ShallowFoundation(footing, soil, actions, code=NTC2018_A2())
 
-    Per stratigrafia:
+    Layered usage:
+
         f = ShallowFoundation(footing, profile=profile, actions=actions,
                               code=NTC2018_A2())
 
-    Per stratigrafia + sismica:
+    Layered + seismic:
+
         seismic = SeismicAction(kh=0.15, kv=0.075)
         f = ShallowFoundation(footing, profile=profile, actions=actions,
                               seismic=seismic, code=NTC2018_Seismic_Reduced())
@@ -59,9 +62,9 @@ class ShallowFoundation:
         seismic: SeismicAction | None = None,
     ):
         if soil is None and profile is None:
-            raise ValueError("Serve almeno uno tra `soil` e `profile`.")
+            raise ValueError("At least one of `soil` and `profile` is required.")
         if actions is None:
-            raise ValueError("Le azioni `actions` sono obbligatorie.")
+            raise ValueError("`actions` is required.")
         self.footing = footing
         self.soil = soil
         self.profile = profile
@@ -69,7 +72,7 @@ class ShallowFoundation:
         self.seismic = seismic
         self.code = code if code is not None else NTC2018_A2()
 
-    # ----- verifiche individuali -------------------------------------------
+    # ----- individual checks -----------------------------------------------
 
     def check_bearing(self, **kwargs) -> BearingResult:
         kwargs.setdefault("profile", self.profile)
@@ -90,7 +93,7 @@ class ShallowFoundation:
             self.footing, self.soil, self.actions, self.code
         )
 
-    # ----- verifica completa -----------------------------------------------
+    # ----- full verification -----------------------------------------------
 
     def verify_all(
         self,
@@ -101,6 +104,20 @@ class ShallowFoundation:
         s_limit: float | None = None,
         skip: Sequence[str] = (),
     ) -> VerificationReport:
+        """Run all verifications and return the aggregated report.
+
+        Args:
+            Q_fraction: Fraction of variable load on total actions.
+            delta_over_phi: Ratio between base/soil friction angle and phi.
+            overturning_axis: ``'x'`` or ``'y'`` for overturning.
+            h_arm: Application lever arm for H (default = D).
+            s_limit: Allowable settlement [m].
+            skip: Names of checks to skip (subset of
+                ``{'bearing', 'sliding', 'overturning', 'settlement'}``).
+
+        Returns:
+            Aggregated ``VerificationReport``.
+        """
         skip = set(skip)
         report = VerificationReport(code_name=self.code.name)
 
@@ -114,8 +131,8 @@ class ShallowFoundation:
             report.overturning = self.check_overturning(
                 axis=overturning_axis, h_arm=h_arm, Q_fraction=Q_fraction
             )
-        # cedimento: serve almeno E nel soil/profile; se manca E in qualche
-        # strato lo skippiamo silenziosamente
+        # settlement: needs at least E in soil/profile; if E is missing in
+        # some layer we silently skip the check
         if "settlement" not in skip:
             try:
                 report.settlement = self.check_settlement(s_limit=s_limit)

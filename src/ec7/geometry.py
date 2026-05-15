@@ -1,8 +1,7 @@
-"""Geometrie di fondazione superficiale.
+"""Shallow-foundation geometries.
 
-Gestisce il calcolo dell'area, dell'area efficace (Meyerhof) sotto carico
-eccentrico, e delle dimensioni efficaci B' e L' usate nella formula di
-capacità portante.
+Handles area, Meyerhof effective area under eccentric loading, and the
+effective dimensions B' and L' used in the bearing-capacity formula.
 """
 
 from __future__ import annotations
@@ -14,34 +13,32 @@ from dataclasses import dataclass
 
 @dataclass
 class EffectiveGeometry:
-    """Risultato del calcolo dell'area efficace."""
+    """Result of the effective-area computation."""
 
-    B_eff: float  # larghezza efficace [m]
-    L_eff: float  # lunghezza efficace [m]
-    A_eff: float  # area efficace [m^2]
+    B_eff: float  # effective width [m]
+    L_eff: float  # effective length [m]
+    A_eff: float  # effective area [m^2]
 
 
 class Footing(ABC):
-    """Classe astratta per una fondazione superficiale.
+    """Abstract base class for a shallow footing.
 
-    Tutte le sottoclassi devono esporre:
-      - `D`            : profondità del piano di posa [m]
-      - `area`         : area lorda [m^2]
-      - `perimeter`    : perimetro lordo [m]
-      - `effective_geometry(e_B, e_L)` : restituisce B', L', A' con il
-                                          metodo di Meyerhof.
-      - `equivalent_BL`: tupla (B, L) equivalente, per fondazioni non
-                         rettangolari serve a interpretare 'lato corto'
-                         e 'lato lungo' nei fattori di forma.
+    Subclasses must expose:
+        - ``D``: embedment depth [m]
+        - ``area``: gross area [m^2]
+        - ``perimeter``: gross perimeter [m]
+        - ``effective_geometry(e_B, e_L)``: B', L', A' via Meyerhof's method
+        - ``equivalent_BL``: ``(B, L)`` tuple used by shape factors to
+          interpret "short" and "long" sides for non-rectangular footings.
     """
 
     def __init__(self, D: float, base_inclination: float = 0.0, ground_inclination: float = 0.0):
         if D < 0:
-            raise ValueError("La profondità di posa D deve essere >= 0.")
+            raise ValueError("Embedment depth D must be >= 0.")
         self.D = D
-        # angoli in radianti, di solito 0
-        self.alpha = math.radians(base_inclination)  # inclinazione della base
-        self.beta = math.radians(ground_inclination)  # inclinazione del piano campagna
+        # angles in radians, usually 0
+        self.alpha = math.radians(base_inclination)  # base inclination
+        self.beta = math.radians(ground_inclination)  # ground-surface inclination
 
     @property
     @abstractmethod
@@ -54,7 +51,7 @@ class Footing(ABC):
     @property
     @abstractmethod
     def equivalent_BL(self) -> tuple[float, float]:
-        """Restituisce (B, L) con B <= L per il calcolo dei fattori di forma."""
+        """Return ``(B, L)`` with B <= L for shape-factor computations."""
 
     @abstractmethod
     def effective_geometry(self, e_B: float, e_L: float) -> EffectiveGeometry: ...
@@ -65,7 +62,7 @@ class Footing(ABC):
 
 
 class RectangularFooting(Footing):
-    """Fondazione rettangolare di lati B (lato corto) e L (lato lungo)."""
+    """Rectangular footing of sides B (short) and L (long)."""
 
     def __init__(
         self,
@@ -77,8 +74,8 @@ class RectangularFooting(Footing):
     ):
         super().__init__(D, base_inclination, ground_inclination)
         if B <= 0 or L <= 0:
-            raise ValueError("B e L devono essere positivi.")
-        # convenzione: B è il lato corto
+            raise ValueError("B and L must be positive.")
+        # convention: B is the short side
         if B > L:
             B, L = L, B
         self.B = B
@@ -97,14 +94,14 @@ class RectangularFooting(Footing):
         return self.B, self.L
 
     def effective_geometry(self, e_B: float, e_L: float) -> EffectiveGeometry:
-        # Metodo di Meyerhof: si "riduce" la fondazione al rettangolo
-        # centrato sulla risultante. EN 1997-1 §6.5.4.
+        # Meyerhof's method: the footing is "reduced" to the rectangle
+        # centered on the load resultant. EN 1997-1 §6.5.4.
         if abs(e_B) >= self.B / 2 or abs(e_L) >= self.L / 2:
             raise ValueError(
-                f"Eccentricità fuori dal nocciolo della fondazione: "
+                f"Eccentricity outside the footing core: "
                 f"e_B={e_B:.3f} (B/2={self.B / 2:.3f}), "
                 f"e_L={e_L:.3f} (L/2={self.L / 2:.3f}). "
-                "La risultante esce dalla base, verifica geometricamente non eseguibile."
+                "Resultant falls outside the base, verification not feasible."
             )
         B_eff = self.B - 2 * abs(e_B)
         L_eff = self.L - 2 * abs(e_L)
@@ -112,9 +109,9 @@ class RectangularFooting(Footing):
 
 
 class StripFooting(RectangularFooting):
-    """Fondazione nastriforme: B finito, L convenzionalmente molto grande.
+    """Strip footing: finite B, conventionally very large L.
 
-    Nei fattori di forma si avranno sq = sgamma = sc = 1.
+    Yields sq = sgamma = sc = 1 in the shape factors.
     """
 
     def __init__(
@@ -125,8 +122,8 @@ class StripFooting(RectangularFooting):
         ground_inclination: float = 0.0,
         L_ref: float = 1.0,
     ):
-        # L_ref è una lunghezza di riferimento per unità di nastro;
-        # i risultati di forza saranno in kN per metro di nastro.
+        # L_ref is a reference length per unit of strip; force results are
+        # in kN per metre of strip.
         super().__init__(
             B=B,
             L=max(B * 1e3, 1e3),
@@ -142,12 +139,12 @@ class StripFooting(RectangularFooting):
 
 
 class CircularFooting(Footing):
-    """Fondazione circolare di raggio R.
+    """Circular footing of radius R.
 
-    Per la verifica si usa una rettangolare equivalente di area uguale
-    al settore residuo sotto eccentricità (approccio EN 1997-1 §6.5.4
-    e Bowles): area efficace = 2 * (R^2 * arccos(e/R) - e * sqrt(R^2-e^2)),
-    quindi B' = L' = sqrt(A_eff).
+    Verification uses an equivalent rectangle whose area equals the
+    residual sector under eccentricity (EN 1997-1 §6.5.4, Bowles):
+    ``A_eff = 2 * (R^2 * arccos(e/R) - e * sqrt(R^2-e^2))``,
+    so ``B' = L' = sqrt(A_eff)``.
     """
 
     def __init__(
@@ -155,7 +152,7 @@ class CircularFooting(Footing):
     ):
         super().__init__(D, base_inclination, ground_inclination)
         if R <= 0:
-            raise ValueError("R deve essere positivo.")
+            raise ValueError("R must be positive.")
         self.R = R
 
     @property
@@ -168,19 +165,19 @@ class CircularFooting(Footing):
 
     @property
     def equivalent_BL(self) -> tuple[float, float]:
-        # diametro come B e L per i fattori di forma (s ≈ caso quadrato)
+        # diameter as B and L for shape factors (s ≈ square case)
         d = 2 * self.R
         return d, d
 
     def effective_geometry(self, e_B: float, e_L: float) -> EffectiveGeometry:
-        # eccentricità risultante
+        # resultant eccentricity
         e = math.hypot(e_B, e_L)
         if e >= self.R:
             raise ValueError(
-                f"Eccentricità risultante {e:.3f} >= R={self.R:.3f}: risultante fuori dalla base."
+                f"Resultant eccentricity {e:.3f} >= R={self.R:.3f}: resultant outside the base."
             )
         R = self.R
         A_eff = 2 * (R**2 * math.acos(e / R) - e * math.sqrt(R**2 - e**2))
-        # rettangolo equivalente di lati uguali
+        # equivalent square rectangle
         side = math.sqrt(A_eff)
         return EffectiveGeometry(B_eff=side, L_eff=side, A_eff=A_eff)

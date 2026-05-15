@@ -1,15 +1,15 @@
-"""Azioni di progetto sulla fondazione.
+"""Design actions on the footing.
 
-Convenzione assi:
-  - x: parallelo a B (lato corto)
-  - y: parallelo a L (lato lungo)
-  - z: verticale verso l'alto
+Axis convention:
+    - x: parallel to B (short side)
+    - y: parallel to L (long side)
+    - z: vertical, upward
 
-V       : forza verticale [kN] (positiva di compressione)
-H_x,H_y : forze orizzontali [kN]
-M_x,M_y : momenti [kN m] attorno agli assi x e y rispettivamente.
-          Il momento M_x produce eccentricità lungo y -> e_L = M_x / V.
-          Il momento M_y produce eccentricità lungo x -> e_B = M_y / V.
+V       : vertical force [kN] (positive in compression)
+H_x,H_y : horizontal forces [kN]
+M_x,M_y : moments [kN m] about the x and y axes respectively.
+          M_x produces eccentricity along y -> e_L = M_x / V.
+          M_y produces eccentricity along x -> e_B = M_y / V.
 """
 
 from __future__ import annotations
@@ -20,34 +20,47 @@ from dataclasses import dataclass
 
 @dataclass
 class DesignActions:
-    """Sollecitazioni applicate alla base della fondazione.
+    """Loads applied at the base of the footing.
 
-    I valori passati sono già caratteristici per default; i fattori parziali
-    sul lato delle azioni (set A) li applica la DesignCode quando richiesto.
-    Se l'utente passa direttamente valori di progetto, può impostare
-    `already_factored=True`.
+    Inputs are characteristic values by default; partial factors on the
+    actions side (A set) are applied by the ``DesignCode`` when requested.
+    If the user passes design values directly, set ``already_factored=True``.
+
+    Attributes:
+        V: Vertical force [kN].
+        H_x: Horizontal force along x [kN].
+        H_y: Horizontal force along y [kN].
+        M_x: Moment about x [kN m] (produces eccentricity along y).
+        M_y: Moment about y [kN m] (produces eccentricity along x).
+        favorable: True if the vertical action is stabilising.
+        already_factored: True if values are already design values.
     """
 
     V: float  # [kN]
     H_x: float = 0.0  # [kN]
     H_y: float = 0.0  # [kN]
-    M_x: float = 0.0  # [kN m]  (intorno all'asse x -> eccentricità in y)
-    M_y: float = 0.0  # [kN m]  (intorno all'asse y -> eccentricità in x)
-    favorable: bool = False  # True se l'azione verticale è favorevole alla stabilità
+    M_x: float = 0.0  # [kN m] (about x -> eccentricity along y)
+    M_y: float = 0.0  # [kN m] (about y -> eccentricity along x)
+    favorable: bool = False
     already_factored: bool = False
 
     def __post_init__(self):
         if self.V <= 0:
-            raise ValueError("V deve essere positivo (compressione sulla fondazione).")
+            raise ValueError("V must be positive (compression on the footing).")
 
     @property
     def H_resultant(self) -> float:
-        """Modulo della forza orizzontale risultante."""
+        """Magnitude of the resultant horizontal force [kN]."""
         return math.hypot(self.H_x, self.H_y)
 
     def eccentricities(self) -> tuple[float, float]:
-        """Eccentricità (e_B, e_L) della risultante rispetto al centro
-        della fondazione. e_B è l'eccentricità lungo la direzione B (lato corto)."""
+        """Return ``(e_B, e_L)`` of the resultant relative to the footing centre.
+
+        ``e_B`` is the eccentricity along direction B (short side).
+
+        Returns:
+            Tuple ``(e_B, e_L)`` in metres.
+        """
         if self.V == 0:
             return 0.0, 0.0
         e_B = self.M_y / self.V
@@ -55,5 +68,5 @@ class DesignActions:
         return e_B, e_L
 
     def horizontal_angle_to_B(self) -> float:
-        """Angolo (radianti) della risultante orizzontale rispetto all'asse B."""
+        """Return the angle (rad) of the horizontal resultant w.r.t. the B axis."""
         return math.atan2(self.H_y, self.H_x)

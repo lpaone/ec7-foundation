@@ -1,4 +1,4 @@
-"""Strutture dati per i risultati delle verifiche."""
+"""Data structures for verification results."""
 
 from __future__ import annotations
 
@@ -9,10 +9,18 @@ from .bearing import BearingCapacityFactors
 
 @dataclass
 class BaseResult:
-    """Risultato comune: domanda E_d, resistenza R_d, fattore di sicurezza."""
+    """Common result: demand E_d, resistance R_d, utilisation ratio.
 
-    E_d: float  # azione di progetto
-    R_d: float  # resistenza di progetto
+    Attributes:
+        E_d: Design action.
+        R_d: Design resistance.
+        name: Result label.
+        units_E: Units of E_d (for display).
+        units_R: Units of R_d (for display).
+    """
+
+    E_d: float
+    R_d: float
     name: str = "Check"
     units_E: str = "kN"
     units_R: str = "kN"
@@ -58,8 +66,8 @@ class BearingResult(BaseResult):
 @dataclass
 class SlidingResult(BaseResult):
     name: str = "Scorrimento"
-    delta: float = 0.0  # angolo di attrito base-terreno [gradi]
-    R_pk: float = 0.0  # resistenza passiva caratteristica (se inclusa)
+    delta: float = 0.0  # base/soil friction angle [deg]
+    R_pk: float = 0.0  # characteristic passive resistance (if included)
 
 
 @dataclass
@@ -67,16 +75,24 @@ class OverturningResult(BaseResult):
     name: str = "Ribaltamento (EQU)"
     units_E: str = "kN m"
     units_R: str = "kN m"
-    axis: str = "y"  # asse di ribaltamento
+    axis: str = "y"  # overturning axis
 
 
 @dataclass
 class SettlementResult:
-    """Cedimento elastico (SLE). Non c'è un confronto E/R: si calcola
-    il cedimento e si confronta con un limite ammissibile fornito dall'utente."""
+    """Elastic settlement (SLE).
 
-    s_elastic: float  # [m]
-    s_limit: float | None = None  # [m] limite SLE
+    There is no E/R comparison: the settlement is computed and compared
+    against a user-supplied allowable value.
+
+    Attributes:
+        s_elastic: Computed elastic settlement [m].
+        s_limit: Allowable settlement [m] for the SLE check.
+        name: Result label.
+    """
+
+    s_elastic: float
+    s_limit: float | None = None
     name: str = "Cedimento elastico (SLE)"
 
     @property
@@ -105,7 +121,7 @@ class SettlementResult:
 
 @dataclass
 class VerificationReport:
-    """Raccolta dei risultati di tutte le verifiche."""
+    """Container for the results of all verifications."""
 
     code_name: str
     bearing: BearingResult | None = None

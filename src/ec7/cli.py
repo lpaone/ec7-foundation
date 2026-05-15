@@ -1,14 +1,14 @@
-"""CLI per il pacchetto ec7-foundation.
+"""CLI for the ec7-foundation package.
 
-Permette di eseguire una verifica leggendo un file di input YAML o JSON
-che descrive geometria, terreno, azioni, normativa e (opzionalmente)
-sisma. Stampa il report a video.
+Runs a verification reading a YAML or JSON input file describing
+geometry, soil, actions, code and optionally seismic action, and prints
+the report.
 
-Uso:
+Usage:
     ec7-verify input.yaml
-    ec7-verify input.json --json    # output strutturato JSON
+    ec7-verify input.json --json    # structured JSON output
 
-Esempio di input minimo (YAML):
+Minimal input example (YAML):
 
     code: NTC2018_A2
     footing:
@@ -16,7 +16,7 @@ Esempio di input minimo (YAML):
       B: 2.5
       L: 3.5
       D: 1.5
-    soil:                 # in alternativa a `profile`
+    soil:                 # alternative to `profile`
       phi_k: 32
       c_k: 5
       gamma: 19
@@ -79,12 +79,12 @@ def _load_input(path: Path) -> dict[str, Any]:
             import yaml  # type: ignore
         except ImportError as exc:  # pragma: no cover
             raise SystemExit(
-                "PyYAML non installato. Installa con: pip install 'ec7-foundation[yaml]'"
+                "PyYAML not installed. Install with: pip install 'ec7-foundation[yaml]'"
             ) from exc
         return yaml.safe_load(text)
     if path.suffix.lower() == ".json":
         return json.loads(text)
-    raise SystemExit(f"Formato file non supportato: {path.suffix}")
+    raise SystemExit(f"Unsupported file format: {path.suffix}")
 
 
 def _build_footing(spec: dict[str, Any]):
@@ -111,7 +111,7 @@ def _build_footing(spec: dict[str, Any]):
             base_inclination=spec.get("base_inclination", 0.0),
             ground_inclination=spec.get("ground_inclination", 0.0),
         )
-    raise SystemExit(f"Tipo fondazione sconosciuto: {t}")
+    raise SystemExit(f"Unknown footing type: {t}")
 
 
 def _build_soil(spec: dict[str, Any]) -> Soil:
@@ -159,12 +159,12 @@ def _build_seismic(spec: dict[str, Any] | None) -> SeismicAction | None:
 
 def _build_code(name: str):
     if name not in _CODES:
-        raise SystemExit(f"Codice sconosciuto: {name}. Disponibili: {', '.join(_CODES)}")
+        raise SystemExit(f"Unknown code: {name}. Available: {', '.join(_CODES)}")
     return _CODES[name]()
 
 
 def _report_to_dict(report) -> dict[str, Any]:
-    """Serializza il report in un dict (per output JSON)."""
+    """Serialise the report into a dict (for JSON output)."""
     out: dict[str, Any] = {"code": report.code_name, "all_passed": report.all_passed}
     if report.bearing:
         d = asdict(report.bearing)
@@ -192,17 +192,17 @@ def _report_to_dict(report) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="ec7-verify",
-        description="Verifica di fondazioni superficiali secondo EC7 / NTC 2018.",
+        description="Shallow-foundation verification per EC7 / NTC 2018.",
     )
-    parser.add_argument("input", type=Path, help="File di input YAML o JSON.")
+    parser.add_argument("input", type=Path, help="YAML or JSON input file.")
     parser.add_argument(
-        "--json", action="store_true", help="Stampa il report in formato JSON anziché testo."
+        "--json", action="store_true", help="Print the report as JSON instead of text."
     )
     parser.add_argument("--version", action="version", version=_version_string())
     args = parser.parse_args(argv)
 
     if not args.input.exists():
-        print(f"File non trovato: {args.input}", file=sys.stderr)
+        print(f"File not found: {args.input}", file=sys.stderr)
         return 2
 
     data = _load_input(args.input)
