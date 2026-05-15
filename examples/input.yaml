@@ -1,0 +1,58 @@
+## Esempio di input per ec7-verify
+## Plinto rettangolare su stratigrafia con falda in zona sismica.
+## Esegui con:  ec7-verify examples/input.yaml
+
+code: NTC2018_Seismic_Reduced
+
+footing:
+  type: rectangular
+  B: 2.5
+  L: 3.5
+  D: 1.5
+
+profile:
+  water_depth: 3.0
+  layers:
+    - top: 0.0
+      bottom: 2.0
+      soil:
+        name: Sabbia limosa
+        phi_k: 28
+        c_k: 0
+        gamma: 18
+        gamma_sat: 19.5
+        E: 15000
+        nu: 0.3
+    - top: 2.0
+      bottom: 8.0
+      soil:
+        name: Sabbia densa
+        phi_k: 34
+        c_k: 0
+        gamma: 19
+        gamma_sat: 20
+        E: 30000
+        nu: 0.3
+    - top: 8.0
+      bottom: 30.0
+      soil:
+        name: Ghiaia
+        phi_k: 36
+        c_k: 0
+        gamma: 20
+        gamma_sat: 21
+        E: 50000
+        nu: 0.3
+
+actions:
+  V: 1500
+  H_x: 300
+  M_y: 200
+
+seismic:
+  kh: 0.06
+  kv: 0.03
+
+settlement_limit: 0.025
+overturning_axis: y
+delta_over_phi: 1.0

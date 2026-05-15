@@ -1,0 +1,145 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+# -------------------------------------------------------------------------
+# Project metadata (PEP 621)
+# -------------------------------------------------------------------------
+[project]
+name = "ec7-foundation"
+version = "0.2.0"
+description = "Verifica di fondazioni superficiali secondo Eurocodice 7 (EN 1997-1) e NTC 2018: capacità portante, scorrimento, ribaltamento e cedimenti, statici e sismici, su stratigrafia con falda."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "ec7-foundation contributors" },
+]
+keywords = [
+    "geotechnics",
+    "civil-engineering",
+    "eurocode-7",
+    "ntc-2018",
+    "shallow-foundation",
+    "bearing-capacity",
+    "settlement",
+    "seismic-design",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Natural Language :: Italian",
+]
+# Modulo "puro" Python, niente dipendenze runtime obbligatorie.
+dependencies = []
+
+[project.optional-dependencies]
+# Lettura input YAML per il CLI
+yaml = ["PyYAML>=6.0"]
+# Set di sviluppo (linting, test, build)
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "PyYAML>=6.0",
+]
+
+[project.urls]
+Homepage      = "https://github.com/youruser/ec7-foundation"
+Documentation = "https://github.com/youruser/ec7-foundation#readme"
+Issues        = "https://github.com/youruser/ec7-foundation/issues"
+Repository    = "https://github.com/youruser/ec7-foundation"
+
+[project.scripts]
+ec7-verify = "ec7.cli:main"
+
+# -------------------------------------------------------------------------
+# Hatchling build configuration (src layout)
+# -------------------------------------------------------------------------
+[tool.hatch.build.targets.wheel]
+packages = ["src/ec7"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/",
+    "tests/",
+    "examples/",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
+# -------------------------------------------------------------------------
+# uv configuration
+# -------------------------------------------------------------------------
+# Set di sviluppo gestito da `uv sync` (PEP 735 dependency-groups).
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "PyYAML>=6.0",
+    "build>=1.2",
+]
+
+# -------------------------------------------------------------------------
+# Pytest
+# -------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+
+# -------------------------------------------------------------------------
+# Ruff (linter + formatter)
+# -------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "C4",  # comprehensions
+]
+ignore = [
+    "E501",  # line too long: trattato dal formatter
+    "B008",  # call in defaults (utile per dataclass default factories)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ec7"]
+
+# -------------------------------------------------------------------------
+# Coverage
+# -------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["ec7"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
