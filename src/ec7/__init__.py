@@ -26,6 +26,7 @@ from .code import (
 )
 from .foundation import ShallowFoundation
 from .geometry import CircularFooting, Footing, RectangularFooting, StripFooting
+from .plot import plot_actions, plot_all, plot_geometry, plot_soil_profile
 from .profile import SoilLayer, SoilProfile
 from .results import (
     BearingResult,
@@ -63,6 +64,10 @@ __all__ = [
     "OverturningResult",
     "SettlementResult",
     "VerificationReport",
+    "plot_geometry",
+    "plot_soil_profile",
+    "plot_actions",
+    "plot_all",
 ]
 
 try:

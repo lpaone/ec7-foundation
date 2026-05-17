@@ -141,6 +141,26 @@ class ShallowFoundation:
 
         return report
 
+    # ----- plotting helpers (matplotlib) -----------------------------------
+
+    def plot_geometry(self, **kwargs):
+        """Schematic of the footing (side + top view). See ``ec7.plot.plot_geometry``."""
+        from .plot import plot_geometry
+
+        return plot_geometry(self, **kwargs)
+
+    def plot_soil_profile(self, **kwargs):
+        """Stratigraphy + material properties. See ``ec7.plot.plot_soil_profile``."""
+        from .plot import plot_soil_profile
+
+        return plot_soil_profile(self, **kwargs)
+
+    def plot_actions(self, **kwargs):
+        """Action reference system (with optional seismic). See ``ec7.plot.plot_actions``."""
+        from .plot import plot_actions
+
+        return plot_actions(self, **kwargs)
+
     def __repr__(self):
         n_layers = len(self.profile.layers) if self.profile else 1
         return (
